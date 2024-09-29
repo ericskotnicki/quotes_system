@@ -1,10 +1,15 @@
 import sqlite3
 import schedule
 import time
+import os
 from datetime import datetime
 import random
 import smtplib
 from email.mime.text import MIMEText
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Database setup
 def setup_database():
@@ -68,16 +73,19 @@ def get_random_quote():
 # Function to send SMS via email
 def send_sms_via_email(quote, author):
     # Email configuration
-    sender_email = "your_email@gmail.com"
-    sender_password = "your_app_password"  # Use an app password for Gmail
+    sender_email = "eric.skotnicki@gmail.com"
+    sender_password = os.getenv('GMAIL_APP_PASSWORD')
+    
+    if sender_password is None:
+        raise ValueError("GMAIL_APP_PASSWORD not set in .env file")
     
     # List of phone numbers and their corresponding email-to-SMS gateways
     recipients = [
-        "1234567890@txt.att.net",        # AT&T
-        "2345678901@tmomail.net",        # T-Mobile
-        "3456789012@vtext.com",          # Verizon
-        "4567890123@messaging.sprintpcs.com",  # Sprint
-        "5678901234@msg.fi.google.com"   # Google Fi
+        "3046851372@txt.att.net",        # AT&T
+        "8324193684@tmomail.net",        # T-Mobile
+        # "3456789012@vtext.com",          # Verizon
+        # "4567890123@messaging.sprintpcs.com",  # Sprint
+        # "5678901234@msg.fi.google.com"   # Google Fi
     ]
     
     # Prepare the message
