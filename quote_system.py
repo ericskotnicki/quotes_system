@@ -1,3 +1,4 @@
+# Import the necessary libraries
 import sqlite3
 import schedule
 import time
@@ -13,15 +14,34 @@ load_dotenv()
 
 # Database setup
 def setup_database():
+    """Create the SQLite database and a table for storing quotes if they don't already exist."""
     conn = sqlite3.connect('quotes.db')
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS quotes
-                 (id INTEGER PRIMARY KEY, quote TEXT, author TEXT, used BOOLEAN)''')
+    c.execute("""CREATE TABLE IF NOT EXISTS quotes
+                 (id INTEGER PRIMARY KEY, quote TEXT UNIQUE, author TEXT, used BOOLEAN)""")
     conn.commit()
     conn.close()
+    print("Database setup complete.")
+
+# Function to remove duplicates from the database
+def remove_duplicates():
+    """Remove any duplicate quotes in the database."""
+    conn = sqlite3.connect('quotes.db')
+    c = conn.cursor()
+
+    # Remove duplicates by keeping only the first occurrence of each quote
+    c.execute("""DELETE FROM quotes
+                 WHERE rowid NOT IN (SELECT MIN(rowid) 
+                                     FROM quotes
+                                     GROUP BY quote)""")
+
+    conn.commit()
+    conn.close()
+    print("Duplicate quotes removed.")
 
 # Function to add new quotes to the database
 def update_database():
+    """Read quotes from a text file and add new quotes to the database, ignoring duplicates."""
     conn = sqlite3.connect('quotes.db')
     c = conn.cursor()
     
@@ -31,16 +51,19 @@ def update_database():
     new_quotes = 0
     errors = 0
     
-    for quote in quotes:
+    for row_number, quote in enumerate(quotes, start=1):
         try:
-            quote_text, author = quote.strip().split('" - ')
-            quote_text = quote_text.strip('"')
-            c.execute("INSERT OR IGNORE INTO quotes (quote, author, used) VALUES (?, ?, ?)", 
-                      (quote_text, author, False))
-            if c.rowcount > 0:
+            quote_text, author = quote.strip().rsplit(' - ', 1)
+            quote_text = quote_text.strip('“”')
+            # Check if the quote is already in the database
+            c.execute("SELECT COUNT(*) FROM quotes WHERE quote = ? AND author = ?", (quote_text, author))
+            if c.fetchone()[0] == 0:
+                c.execute("INSERT INTO quotes (quote, author, used) VALUES (?, ?, ?)", 
+                          (quote_text, author, False))
                 new_quotes += 1
         except ValueError:
             errors += 1
+            print(f"Error in row {row_number}: {quote.strip()}")
     
     conn.commit()
     
@@ -50,6 +73,8 @@ def update_database():
     
     conn.close()
     
+    print(f"Database update completed. New quotes added: {new_quotes}. Errors: {errors}. Total quotes: {total_quotes}.")
+    
     # Update summary file
     with open('summary.txt', 'a') as summary:
         summary.write(f"Update Date: {datetime.now()}\n")
@@ -57,38 +82,31 @@ def update_database():
         summary.write(f"New Quotes Added: {new_quotes}\n")
         summary.write(f"Errors: {errors}\n\n")
 
-# Function to get a random unused quote
+# Function to retrieve a random unused quote from the database
 def get_random_quote():
+    """Select a random unused quote from the database."""
     conn = sqlite3.connect('quotes.db')
     c = conn.cursor()
-    c.execute("SELECT id, quote, author FROM quotes WHERE used = 0 ORDER BY RANDOM() LIMIT 1")
+    c.execute("SELECT quote, author FROM quotes WHERE used = 0 ORDER BY RANDOM() LIMIT 1")
     result = c.fetchone()
-    if result:
-        quote_id, quote, author = result
-        c.execute("UPDATE quotes SET used = 1 WHERE id = ?", (quote_id,))
-        conn.commit()
     conn.close()
-    return quote, author if result else (None, None)
+    if result:
+        return result[0], result[1]
+    return None, None
 
-# Function to send SMS via email
+# Function to send an SMS via email
 def send_sms_via_email(quote, author):
-    # Email configuration
+    """Send a quote via email to SMS gateway."""
     sender_email = "eric.skotnicki@gmail.com"
-    sender_password = os.getenv('GMAIL_APP_PASSWORD')
+    sender_password = os.getenv("GMAIL_APP_PASSWORD")
+    if not sender_email or not sender_password:
+        raise ValueError("GMAIL_USER or GMAIL_APP_PASSWORD not set in .env file")
     
-    if sender_password is None:
-        raise ValueError("GMAIL_APP_PASSWORD not set in .env file")
-    
-    # List of phone numbers and their corresponding email-to-SMS gateways
     recipients = [
-        "3046851372@txt.att.net",        # AT&T
-        "8324193684@tmomail.net",        # T-Mobile
-        # "3456789012@vtext.com",          # Verizon
-        # "4567890123@messaging.sprintpcs.com",  # Sprint
-        # "5678901234@msg.fi.google.com"   # Google Fi
+        "3046851372@txt.att.net",
+        "8324193684@tmomail.net"
     ]
     
-    # Prepare the message
     subject = "Quote of the Day"
     body = f"Quote of the Day: \"{quote}\" - {author}"
     
@@ -97,7 +115,6 @@ def send_sms_via_email(quote, author):
     msg['From'] = sender_email
     msg['To'] = ', '.join(recipients)
     
-    # Send the email
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp_server:
             smtp_server.login(sender_email, sender_password)
@@ -108,17 +125,25 @@ def send_sms_via_email(quote, author):
 
 # Function to send daily quote
 def send_daily_quote():
+    """Gets a random quote and sends it to the recipients via email-to-SMS gateways."""
     quote, author = get_random_quote()
     if quote and author:
         send_sms_via_email(quote, author)
+    else:
+        print("No unused quotes available to send.")
 
 # Schedule tasks
-schedule.every().monday.at("00:00").do(update_database)
-schedule.every().day.at("09:00").do(send_daily_quote)
+schedule.every().monday.at("00:00").do(update_database)   # Updates the database every Monday at midnight
+schedule.every().day.at("09:00").do(send_daily_quote)   # Sends the daily quote every day at 9:00 AM
+
+# Quick test schedule
+# schedule.every(1).minutes.do(send_daily_quote)   # Sends the daily quote every minute for testing
 
 # Main loop
 if __name__ == "__main__":
     setup_database()
+    remove_duplicates()  # Ensure duplicates are removed initially
+    update_database()  # Ensure the database is updated with quotes initially
     while True:
         schedule.run_pending()
         time.sleep(60)

@@ -2,3 +2,7 @@ env/
 .env
 *.pyc
 __pycache__/
+summary.txt
+quotes.txt
+quotes.db
+scratch/
