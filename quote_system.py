@@ -148,6 +148,7 @@ def send_daily_quote():
 # Schedule tasks
 schedule.every().monday.at("00:00").do(update_database)   # Updates the database every Monday at midnight
 schedule.every().day.at("09:00").do(send_daily_quote)   # Sends the daily quote every day at 9:00 AM
+schedule.every().day.at("19:00").do(send_daily_quote)   # Sends the daily quote every day at 7:00 PM
 
 # Quick test schedule
 # schedule.every(1).minutes.do(send_daily_quote)   # Sends the daily quote every minute for testing
