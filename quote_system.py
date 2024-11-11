@@ -90,6 +90,7 @@ def update_database():
         summary.write(f"New Quotes Added: {new_quotes}\n")
         summary.write(f"Errors: {errors}\n\n")
 
+
 # Function to retrieve a random unused quote from the database
 def get_random_quote():
     """Select a random unused quote from the database."""
@@ -105,15 +106,12 @@ def get_random_quote():
 # Function to send an SMS via email
 def send_sms_via_email(quote, author):
     """Send a quote via email to SMS gateway."""
-    sender_email = "eric.skotnicki@gmail.com"
+    sender_email = os.getenv("GMAIL_USER")
     sender_password = os.getenv("GMAIL_APP_PASSWORD")
     if not sender_email or not sender_password:
         raise ValueError("GMAIL_USER or GMAIL_APP_PASSWORD not set in .env file")
     
-    recipients = [
-        "3046851372@txt.att.net",
-        "8324193684@tmomail.net"
-    ]
+    recipients = os.getenv("RECIPIENTS").split(',')
     
     # subject = "Quote of the Day"
     body = f'Quote of the Day:\n"{quote}" - {author}'
@@ -151,7 +149,7 @@ schedule.every().day.at("09:00").do(send_daily_quote)   # Sends the daily quote 
 schedule.every().day.at("19:00").do(send_daily_quote)   # Sends the daily quote every day at 7:00 PM
 
 # Quick test schedule
-# schedule.every(1).minutes.do(send_daily_quote)   # Sends the daily quote every minute for testing
+schedule.every(1).minutes.do(send_daily_quote)   # Sends the daily quote every minute for testing
 
 # Main loop
 if __name__ == "__main__":
