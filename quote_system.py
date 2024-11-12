@@ -149,7 +149,7 @@ schedule.every().day.at("09:00").do(send_daily_quote)   # Sends the daily quote 
 schedule.every().day.at("19:00").do(send_daily_quote)   # Sends the daily quote every day at 7:00 PM
 
 # Quick test schedule
-schedule.every(1).minutes.do(send_daily_quote)   # Sends the daily quote every minute for testing
+# schedule.every(1).minutes.do(send_daily_quote)   # Sends the daily quote every minute for testing
 
 # Main loop
 if __name__ == "__main__":
